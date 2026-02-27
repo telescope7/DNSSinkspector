@@ -1,0 +1,53 @@
+[server]
+# Use >=1024 unless running with elevated privileges.
+listen_address = "0.0.0.0"
+listen_port = 5300
+
+# JSON Lines output for downstream analysis in R/Python/etc.
+log_path = "logs/events.jsonl"
+tsv_log_path = "logs/events.tsv"
+
+# Sanitized logs exclude payload-heavy fields like data_text/data_base64.
+clean_log_path = "logs/events-clean.jsonl"
+clean_tsv_log_path = "logs/events-clean.tsv"
+
+# Behavior for domains that do not match any zone:
+# - "NXDOMAIN": return DNS NXDOMAIN
+# - "NODATA": return NOERROR with no answers
+default_response = "NXDOMAIN"
+
+# Sets AA bit in DNS responses.
+authoritative = true
+
+[http]
+enabled = true
+listen_address = "0.0.0.0"
+listen_port = 80
+read_timeout_ms = 5000
+capture_max_bytes = 16384
+
+[smtp]
+enabled = true
+listen_address = "0.0.0.0"
+listen_port = 25
+read_timeout_ms = 8000
+capture_max_bytes = 32768
+
+[ftp]
+enabled = true
+listen_address = "0.0.0.0"
+listen_port = 21
+read_timeout_ms = 8000
+capture_max_bytes = 16384
+
+[[zones]]
+domain = "malware-test.local"
+answer_ipv4 = ["10.10.10.10"]
+ttl = 60
+tags = ["sinkhole", "test", "malware"]
+
+[[zones]]
+domain = "example-botnet.local"
+answer_ipv4 = ["10.10.10.11", "10.10.10.12"]
+ttl = 120
+tags = ["sinkhole", "c2"]

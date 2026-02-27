@@ -6,11 +6,13 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import org.dnssinkspector.config.SinkholeConfig;
 import org.dnssinkspector.config.TomlConfigLoader;
 import org.dnssinkspector.dns.DnsServer;
+import org.dnssinkspector.logging.AsnEnrichingEventLogger;
 import org.dnssinkspector.logging.CompositeEventLogger;
 import org.dnssinkspector.logging.EventLogger;
 import org.dnssinkspector.logging.JsonlEventLogger;
@@ -36,13 +38,17 @@ public final class Main {
 
             SinkholeConfig config = TomlConfigLoader.load(options.configPath);
             Set<String> sanitizedExcludedFields = Set.of("data_text", "data_base64");
-            EventLogger eventLogger = new CompositeEventLogger(List.of(
+            EventLogger baseLogger = new CompositeEventLogger(List.of(
                     new JsonlEventLogger(config.getJsonLogPath()),
                     new TsvEventLogger(config.getTsvLogPath()),
                     new SanitizingEventLogger(
                             new JsonlEventLogger(config.getCleanJsonLogPath()),
                             sanitizedExcludedFields),
                     new TsvEventLogger(config.getCleanTsvLogPath(), sanitizedExcludedFields)));
+            Optional<Path> maxmindAsnDbPath = config.getMaxmindAsnDbPath();
+            EventLogger eventLogger = maxmindAsnDbPath.isPresent()
+                    ? new AsnEnrichingEventLogger(baseLogger, maxmindAsnDbPath.get())
+                    : baseLogger;
             DnsServer dnsServer = new DnsServer(config, eventLogger);
             List<CaptureService> tcpServers = new ArrayList<>();
 
@@ -91,6 +97,9 @@ public final class Main {
             System.out.printf("Full TSV log file: %s%n", config.getTsvLogPath().toAbsolutePath());
             System.out.printf("Clean JSONL log file: %s%n", config.getCleanJsonLogPath().toAbsolutePath());
             System.out.printf("Clean TSV log file: %s%n", config.getCleanTsvLogPath().toAbsolutePath());
+            if (maxmindAsnDbPath.isPresent()) {
+                System.out.printf("MaxMind ASN DB: %s%n", maxmindAsnDbPath.get().toAbsolutePath());
+            }
             dnsServer.start();
         } catch (IllegalArgumentException e) {
             System.err.println("Argument error: " + e.getMessage());

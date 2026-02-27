@@ -11,6 +11,10 @@ tsv_log_path = "logs/events.tsv"
 clean_log_path = "logs/events-clean.jsonl"
 clean_tsv_log_path = "logs/events-clean.tsv"
 
+# MaxMind ASN database for IP enrichment in logs.
+# Default in code is "GeoLite2-ASN.mmdb" at project root.
+maxmind_asn_db_path = "GeoLite2-ASN.mmdb"
+
 # Behavior for domains that do not match any zone:
 # - "NXDOMAIN": return DNS NXDOMAIN
 # - "NODATA": return NOERROR with no answers

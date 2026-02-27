@@ -98,5 +98,10 @@
             <artifactId>ftpserver-core</artifactId>
             <version>1.2.0</version>
         </dependency>
+        <dependency>
+            <groupId>com.maxmind.geoip2</groupId>
+            <artifactId>geoip2</artifactId>
+            <version>4.3.1</version>
+        </dependency>
     </dependencies>
 </project>

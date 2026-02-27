@@ -129,6 +129,7 @@ public final class SinkholeConfig {
     private final Path tsvLogPath;
     private final Path cleanJsonLogPath;
     private final Path cleanTsvLogPath;
+    private final Path maxmindAsnDbPath;
     private final TcpServiceConfig httpConfig;
     private final TcpServiceConfig smtpConfig;
     private final TcpServiceConfig ftpConfig;
@@ -143,6 +144,7 @@ public final class SinkholeConfig {
             Path tsvLogPath,
             Path cleanJsonLogPath,
             Path cleanTsvLogPath,
+            Path maxmindAsnDbPath,
             TcpServiceConfig httpConfig,
             TcpServiceConfig smtpConfig,
             TcpServiceConfig ftpConfig,
@@ -155,6 +157,7 @@ public final class SinkholeConfig {
         this.tsvLogPath = tsvLogPath;
         this.cleanJsonLogPath = cleanJsonLogPath;
         this.cleanTsvLogPath = cleanTsvLogPath;
+        this.maxmindAsnDbPath = maxmindAsnDbPath;
         this.httpConfig = httpConfig;
         this.smtpConfig = smtpConfig;
         this.ftpConfig = ftpConfig;
@@ -196,6 +199,10 @@ public final class SinkholeConfig {
 
     public Path getCleanTsvLogPath() {
         return cleanTsvLogPath;
+    }
+
+    public Optional<Path> getMaxmindAsnDbPath() {
+        return Optional.ofNullable(maxmindAsnDbPath);
     }
 
     public TcpServiceConfig getHttpConfig() {

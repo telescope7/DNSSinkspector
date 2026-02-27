@@ -23,6 +23,9 @@ Key settings:
 - `[http]`, `[smtp]`, `[ftp]`
 - `[[zones]]` entries (one per domain)
 
+ASN enrichment can be enabled with:
+- `server.maxmind_asn_db_path` (path to MaxMind ASN `.mmdb`, defaults to `GeoLite2-ASN.mmdb` in project root)
+
 HTTPS support is configured under `[http]` using:
 - `tls_enabled`
 - `tls_keystore_path`
@@ -101,6 +104,8 @@ Important fields:
 - `protocol`, `transport`
 - `client_ip`, `client_port`
 - `server_ip`, `server_port`
+- `client_asn_number`, `client_asn_name`
+- `server_asn_number`, `server_asn_name`
 - `query_name`, `query_type_name`
 - `matched_zone`, `zone_tags`
 - `decision`, `response_rcode_name`

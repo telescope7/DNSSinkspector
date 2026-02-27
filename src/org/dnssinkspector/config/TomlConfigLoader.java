@@ -103,6 +103,10 @@ public final class TomlConfigLoader {
                 serverTable,
                 "clean_tsv_log_path",
                 "logs/events-clean.tsv"));
+        String maxmindAsnDbPathRaw = getString(serverTable, "maxmind_asn_db_path", "GeoLite2-ASN.mmdb");
+        Path maxmindAsnDbPath = maxmindAsnDbPathRaw.trim().isEmpty()
+                ? null
+                : Paths.get(maxmindAsnDbPathRaw);
 
         String defaultResponseRaw = getString(serverTable, "default_response", "NXDOMAIN")
                 .toUpperCase(Locale.ROOT);
@@ -170,6 +174,7 @@ public final class TomlConfigLoader {
                 tsvLogPath,
                 cleanJsonLogPath,
                 cleanTsvLogPath,
+                maxmindAsnDbPath,
                 httpConfig,
                 smtpConfig,
                 ftpConfig,

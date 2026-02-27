@@ -107,7 +107,8 @@ public final class Main {
 
     private static void printUsage() {
         System.out.println("Usage:");
-        System.out.println("  java -cp bin org.dnssinkspector.Main [--config <path>] [--help]");
+        System.out.println("  java -jar dnssinkspector-<version>.jar [--config <path>] [--help]");
+        System.out.println("  ./bin/run.sh [--config <path>] [--help]");
         System.out.println();
         System.out.println("Defaults:");
         System.out.println("  --config config/sinkhole.toml");

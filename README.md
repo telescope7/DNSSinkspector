@@ -25,13 +25,39 @@ Protocol listeners default to disabled unless `enabled = true`.
 
 ## Build
 ```bash
-mkdir -p bin
-javac -d bin $(find src -name "*.java")
+mvn -DskipTests clean package
 ```
 
 ## Run
 ```bash
-java -cp bin org.dnssinkspector.Main --config config/sinkhole.toml
+java -jar target/dnssinkspector-1.0.0.jar --config config/sinkhole.toml
+```
+
+## Build Dist Bundle
+Create a runnable distribution with:
+- JAR in `lib/`
+- shell runner in `bin/run.sh`
+- default config in `config/`
+- archives in both `.zip` and `.tar.gz`
+
+```bash
+./scripts/build-package-distribute.sh
+```
+
+Optional custom Maven repo location:
+```bash
+MAVEN_REPO_LOCAL=/path/to/repo ./scripts/build-package-distribute.sh
+```
+
+Artifacts are written to:
+```bash
+dist/dnssinkspector-1.0.0.zip
+dist/dnssinkspector-1.0.0.tar.gz
+```
+
+Run from extracted bundle:
+```bash
+./bin/run.sh
 ```
 
 Note: ports below `1024` (`80/25/21`) usually require elevated privileges. For local unprivileged testing, set higher ports (for example `8080/2525/2121`) in TOML.

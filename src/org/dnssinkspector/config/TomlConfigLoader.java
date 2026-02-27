@@ -123,21 +123,24 @@ public final class TomlConfigLoader {
                 listenAddress,
                 80,
                 5000,
-                16384);
+                16384,
+                true);
         SinkholeConfig.TcpServiceConfig smtpConfig = parseTcpServiceConfig(
                 "smtp",
                 smtpTable,
                 listenAddress,
                 25,
                 8000,
-                32768);
+                32768,
+                false);
         SinkholeConfig.TcpServiceConfig ftpConfig = parseTcpServiceConfig(
                 "ftp",
                 ftpTable,
                 listenAddress,
                 21,
                 8000,
-                16384);
+                16384,
+                false);
 
         List<Zone> zones = new ArrayList<>();
         for (int i = 0; i < zoneTables.size(); i++) {
@@ -396,12 +399,18 @@ public final class TomlConfigLoader {
             String defaultAddress,
             int defaultPort,
             int defaultReadTimeoutMs,
-            int defaultCaptureMaxBytes) {
+            int defaultCaptureMaxBytes,
+            boolean supportsTls) {
         boolean enabled = getBoolean(table, "enabled", false);
         String listenAddress = getString(table, "listen_address", defaultAddress);
         int listenPort = getInt(table, "listen_port", defaultPort);
         int readTimeoutMs = getInt(table, "read_timeout_ms", defaultReadTimeoutMs);
         int captureMaxBytes = getInt(table, "capture_max_bytes", defaultCaptureMaxBytes);
+        boolean tlsEnabled = getBoolean(table, "tls_enabled", false);
+        String tlsKeystorePath = getString(table, "tls_keystore_path", "");
+        String tlsKeystorePassword = getString(table, "tls_keystore_password", "");
+        String tlsKeyPassword = getString(table, "tls_key_password", "");
+        String tlsKeystoreType = getString(table, "tls_keystore_type", "PKCS12");
 
         if (listenPort < 1 || listenPort > 65535) {
             throw new IllegalArgumentException(tableName + ".listen_port must be 1-65535");
@@ -412,13 +421,33 @@ public final class TomlConfigLoader {
         if (captureMaxBytes < 256) {
             throw new IllegalArgumentException(tableName + ".capture_max_bytes must be >= 256");
         }
+        if (tlsEnabled && !supportsTls) {
+            throw new IllegalArgumentException(tableName + ".tls_enabled is not supported");
+        }
+        if (tlsEnabled) {
+            if (tlsKeystorePath.trim().isEmpty()) {
+                throw new IllegalArgumentException(tableName + ".tls_keystore_path is required when tls_enabled=true");
+            }
+            if (tlsKeystorePassword.isEmpty()) {
+                throw new IllegalArgumentException(
+                        tableName + ".tls_keystore_password is required when tls_enabled=true");
+            }
+            if (tlsKeystoreType.trim().isEmpty()) {
+                throw new IllegalArgumentException(tableName + ".tls_keystore_type must not be empty");
+            }
+        }
 
         return new SinkholeConfig.TcpServiceConfig(
                 enabled,
                 listenAddress,
                 listenPort,
                 readTimeoutMs,
-                captureMaxBytes);
+                captureMaxBytes,
+                tlsEnabled,
+                tlsKeystorePath,
+                tlsKeystorePassword,
+                tlsKeyPassword,
+                tlsKeystoreType);
     }
 
     private static Inet4Address parseIpv4(String raw, String fieldName) {

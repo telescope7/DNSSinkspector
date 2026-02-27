@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.dnssinkspector.config.SinkholeConfig.TcpServiceConfig;
 import org.dnssinkspector.logging.EventLogger;
 
-public abstract class AbstractTcpCaptureServer {
+public abstract class AbstractTcpCaptureServer implements CaptureService {
     private final String protocolName;
     private final TcpServiceConfig config;
     private final EventLogger eventLogger;
@@ -32,6 +32,7 @@ public abstract class AbstractTcpCaptureServer {
         this.eventLogger = eventLogger;
     }
 
+    @Override
     public synchronized void start() throws IOException {
         if (running) {
             return;
@@ -45,6 +46,7 @@ public abstract class AbstractTcpCaptureServer {
         acceptThread.start();
     }
 
+    @Override
     public synchronized void stop() {
         running = false;
         if (serverSocket != null && !serverSocket.isClosed()) {
@@ -73,10 +75,12 @@ public abstract class AbstractTcpCaptureServer {
         }
     }
 
+    @Override
     public String getProtocolName() {
         return protocolName;
     }
 
+    @Override
     public TcpServiceConfig getConfig() {
         return config;
     }

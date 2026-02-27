@@ -25,6 +25,12 @@ listen_address = "0.0.0.0"
 listen_port = 80
 read_timeout_ms = 5000
 capture_max_bytes = 16384
+# Optional HTTPS mode (set listen_port = 443 for standard HTTPS):
+# tls_enabled = true
+# tls_keystore_path = "config/https-keystore.p12"
+# tls_keystore_password = "changeit"
+# tls_key_password = "changeit"
+# tls_keystore_type = "PKCS12"
 
 [smtp]
 enabled = true

@@ -18,11 +18,19 @@ import org.dnssinkspector.config.SinkholeConfig;
 import org.dnssinkspector.config.SinkholeConfig.DefaultResponseMode;
 import org.dnssinkspector.config.SinkholeConfig.Zone;
 import org.dnssinkspector.logging.EventLogger;
+import org.xbill.DNS.ARecord;
+import org.xbill.DNS.DClass;
+import org.xbill.DNS.Flags;
+import org.xbill.DNS.Header;
+import org.xbill.DNS.Message;
+import org.xbill.DNS.Name;
+import org.xbill.DNS.Rcode;
+import org.xbill.DNS.Record;
+import org.xbill.DNS.Section;
+import org.xbill.DNS.Type;
+import org.xbill.DNS.WireParseException;
 
 public final class DnsServer {
-    private static final int DNS_CLASS_IN = 1;
-    private static final int DNS_TYPE_A = 1;
-    private static final int DNS_TYPE_ANY = 255;
     private static final int MAX_PACKET_BYTES = 2048;
 
     private final SinkholeConfig config;
@@ -67,26 +75,27 @@ public final class DnsServer {
                 packet.getOffset(),
                 packet.getOffset() + packet.getLength());
 
-        int txid = DnsPacketCodec.readTransactionId(requestPacket, requestPacket.length);
-        boolean recursionDesired = DnsPacketCodec.readRecursionDesired(requestPacket, requestPacket.length);
+        int txid = readTransactionId(requestPacket);
+        boolean recursionDesired = readRecursionDesired(requestPacket);
 
-        DnsQuery query = null;
+        DnsQueryInfo query = null;
         DnsResponsePlan plan = null;
         Zone matchedZone = null;
         byte[] response = null;
         String parseError = null;
 
         try {
-            query = DnsPacketCodec.parseQuery(requestPacket, requestPacket.length);
-            txid = query.getTransactionId();
-            recursionDesired = query.isRecursionDesired();
+            Message queryMessage = new Message(requestPacket);
+            query = DnsQueryInfo.fromMessage(queryMessage);
+            txid = query.transactionId();
+            recursionDesired = query.recursionDesired();
 
-            Optional<Zone> zoneMatch = config.findZone(query.getQname());
+            Optional<Zone> zoneMatch = config.findZone(query.queryName());
             if (zoneMatch.isPresent()) {
                 matchedZone = zoneMatch.get();
-                if (query.getQclass() != DNS_CLASS_IN) {
+                if (query.queryClass() != DClass.IN) {
                     plan = DnsResponsePlan.noData("matched_zone_unsupported_class");
-                } else if (query.getQtype() == DNS_TYPE_A || query.getQtype() == DNS_TYPE_ANY) {
+                } else if (query.queryType() == Type.A || query.queryType() == Type.ANY) {
                     plan = DnsResponsePlan.matchedZone(matchedZone.getAnswerIpv4(), matchedZone.getTtlSeconds());
                 } else {
                     plan = DnsResponsePlan.noData("matched_zone_unsupported_qtype");
@@ -99,16 +108,13 @@ public final class DnsServer {
                 }
             }
 
-            response = DnsPacketCodec.buildResponse(query, plan, config.isAuthoritative());
+            response = buildResponse(query, plan);
             sendResponse(response, packet);
         } catch (Exception e) {
             parseError = e.getMessage();
             plan = DnsResponsePlan.formerr("parse_error");
             try {
-                response = DnsPacketCodec.buildMinimalErrorResponse(
-                        txid,
-                        recursionDesired,
-                        DnsResponsePlan.RCODE_FORMERR);
+                response = buildMinimalErrorResponse(txid, recursionDesired, DnsResponsePlan.RCODE_FORMERR);
                 sendResponse(response, packet);
             } catch (IOException sendError) {
                 parseError = parseError + "; failed to send FORMERR response: " + sendError.getMessage();
@@ -131,7 +137,7 @@ public final class DnsServer {
             DatagramPacket requestPacket,
             byte[] requestPayload,
             byte[] responsePayload,
-            DnsQuery query,
+            DnsQueryInfo query,
             Zone matchedZone,
             DnsResponsePlan plan,
             String parseError,
@@ -148,16 +154,16 @@ public final class DnsServer {
         event.put("server_port", socket.getLocalPort());
 
         if (query != null) {
-            event.put("transaction_id", query.getTransactionId());
-            event.put("recursion_desired", query.isRecursionDesired());
-            event.put("query_name", query.getQname());
-            event.put("query_type", query.getQtype());
-            event.put("query_type_name", DnsPacketCodec.typeName(query.getQtype()));
-            event.put("query_class", query.getQclass());
-            event.put("query_class_name", DnsPacketCodec.className(query.getQclass()));
+            event.put("transaction_id", query.transactionId());
+            event.put("recursion_desired", query.recursionDesired());
+            event.put("query_name", query.queryName());
+            event.put("query_type", query.queryType());
+            event.put("query_type_name", Type.string(query.queryType()));
+            event.put("query_class", query.queryClass());
+            event.put("query_class_name", DClass.string(query.queryClass()));
         } else {
-            event.put("transaction_id", DnsPacketCodec.readTransactionId(requestPayload, requestPayload.length));
-            event.put("recursion_desired", DnsPacketCodec.readRecursionDesired(requestPayload, requestPayload.length));
+            event.put("transaction_id", readTransactionId(requestPayload));
+            event.put("recursion_desired", readRecursionDesired(requestPayload));
             event.put("query_name", null);
             event.put("query_type", null);
             event.put("query_type_name", null);
@@ -176,7 +182,7 @@ public final class DnsServer {
         if (plan != null) {
             event.put("decision", plan.getDecision());
             event.put("response_rcode", plan.getRcode());
-            event.put("response_rcode_name", DnsPacketCodec.rcodeName(plan.getRcode()));
+            event.put("response_rcode_name", Rcode.string(plan.getRcode()));
             event.put("answer_count", plan.getAnswerIpv4().size());
             event.put("answer_ipv4", toIpv4Strings(plan.getAnswerIpv4()));
         } else {
@@ -196,11 +202,92 @@ public final class DnsServer {
         eventLogger.logEvent(event);
     }
 
+    private byte[] buildResponse(DnsQueryInfo query, DnsResponsePlan plan) throws IOException {
+        Message response = new Message();
+        Header header = response.getHeader();
+        header.setID(query.transactionId());
+        header.setFlag(Flags.QR);
+        if (config.isAuthoritative()) {
+            header.setFlag(Flags.AA);
+        }
+        if (query.recursionDesired()) {
+            header.setFlag(Flags.RD);
+        }
+        header.setOpcode(query.opcode());
+        header.setRcode(plan.getRcode());
+
+        response.addRecord(query.questionRecord(), Section.QUESTION);
+        if (plan.getRcode() == DnsResponsePlan.RCODE_NOERROR) {
+            for (Inet4Address answerIpv4 : plan.getAnswerIpv4()) {
+                response.addRecord(
+                        new ARecord(query.questionName(), DClass.IN, plan.getTtlSeconds(), answerIpv4),
+                        Section.ANSWER);
+            }
+        }
+
+        return response.toWire(MAX_PACKET_BYTES);
+    }
+
+    private byte[] buildMinimalErrorResponse(int transactionId, boolean recursionDesired, int rcode) {
+        Message response = new Message();
+        Header header = response.getHeader();
+        header.setID(transactionId);
+        header.setFlag(Flags.QR);
+        if (recursionDesired) {
+            header.setFlag(Flags.RD);
+        }
+        header.setRcode(rcode);
+        return response.toWire();
+    }
+
+    private static int readTransactionId(byte[] packet) {
+        if (packet.length < 2) {
+            return 0;
+        }
+        return ((packet[0] & 0xFF) << 8) | (packet[1] & 0xFF);
+    }
+
+    private static boolean readRecursionDesired(byte[] packet) {
+        if (packet.length < 4) {
+            return false;
+        }
+        int flags = ((packet[2] & 0xFF) << 8) | (packet[3] & 0xFF);
+        return (flags & 0x0100) != 0;
+    }
+
     private static List<String> toIpv4Strings(List<Inet4Address> addresses) {
         List<String> values = new ArrayList<>(addresses.size());
         for (Inet4Address address : addresses) {
             values.add(address.getHostAddress());
         }
         return values;
+    }
+
+    private record DnsQueryInfo(
+            int transactionId,
+            int opcode,
+            boolean recursionDesired,
+            String queryName,
+            Name questionName,
+            int queryType,
+            int queryClass,
+            Record questionRecord) {
+        private static DnsQueryInfo fromMessage(Message message) throws WireParseException {
+            Record question = message.getQuestion();
+            if (question == null) {
+                throw new WireParseException("DNS question section is empty");
+            }
+            Header header = message.getHeader();
+            Name qname = question.getName();
+            return new DnsQueryInfo(
+                    header.getID(),
+                    header.getOpcode(),
+                    header.getFlag(Flags.RD),
+                    qname.toString(true),
+                    qname,
+                    question.getType(),
+                    question.getDClass(),
+                    question);
+        }
     }
 }

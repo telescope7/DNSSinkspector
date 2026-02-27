@@ -3,11 +3,13 @@
 Command-line DNS sinkhole service in Java.
 
 It listens for DNS queries over UDP, matches domains from a TOML config, returns configured sinkhole A records, and writes structured events for analysis.
-It also includes basic HTTP/SMTP/FTP TCP listeners for credential/request capture and logging.
+It also includes a JDK HttpServer-based HTTP listener (HTTPS-ready), an Apache FtpServer-based FTP listener, and an Apache James-based SMTP listener for credential/request capture and logging.
 
 ## Features
 - UDP DNS listener (default port `5300`)
-- HTTP/SMTP/FTP TCP listeners (default ports `80/25/21`)
+- HTTP listener built on JDK HttpServer (default port `80`, optional HTTPS)
+- FTP listener built on Apache FtpServer (default port `21`)
+- SMTP listener built on Apache James protocols (default port `25`)
 - TOML-driven multi-domain zone rules
 - Exact and subdomain matching (`a.b.example.com` can match `example.com`)
 - Configurable fallback behavior (`NXDOMAIN` or `NODATA`)
@@ -20,6 +22,13 @@ Key settings:
 - `[server]`
 - `[http]`, `[smtp]`, `[ftp]`
 - `[[zones]]` entries (one per domain)
+
+HTTPS support is configured under `[http]` using:
+- `tls_enabled`
+- `tls_keystore_path`
+- `tls_keystore_password`
+- `tls_key_password` (optional, defaults to keystore password)
+- `tls_keystore_type` (default `PKCS12`)
 
 Protocol listeners default to disabled unless `enabled = true`.
 
@@ -73,6 +82,7 @@ dig @127.0.0.1 -p 5300 unknown-domain.local A
 ## Test TCP listeners
 ```bash
 curl -v http://127.0.0.1:8080/
+curl -vk https://127.0.0.1:8443/   # when [http].tls_enabled = true
 printf "USER test\r\nPASS secret\r\nQUIT\r\n" | nc 127.0.0.1 2121
 printf "EHLO local\r\nAUTH LOGIN\r\ndGVzdHVzZXI=\r\nc2VjcmV0\r\nQUIT\r\n" | nc 127.0.0.1 2525
 ```

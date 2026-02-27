@@ -51,18 +51,33 @@ public final class SinkholeConfig {
         private final int listenPort;
         private final int readTimeoutMs;
         private final int captureMaxBytes;
+        private final boolean tlsEnabled;
+        private final String tlsKeystorePath;
+        private final String tlsKeystorePassword;
+        private final String tlsKeyPassword;
+        private final String tlsKeystoreType;
 
         public TcpServiceConfig(
                 boolean enabled,
                 String listenAddress,
                 int listenPort,
                 int readTimeoutMs,
-                int captureMaxBytes) {
+                int captureMaxBytes,
+                boolean tlsEnabled,
+                String tlsKeystorePath,
+                String tlsKeystorePassword,
+                String tlsKeyPassword,
+                String tlsKeystoreType) {
             this.enabled = enabled;
             this.listenAddress = listenAddress;
             this.listenPort = listenPort;
             this.readTimeoutMs = readTimeoutMs;
             this.captureMaxBytes = captureMaxBytes;
+            this.tlsEnabled = tlsEnabled;
+            this.tlsKeystorePath = tlsKeystorePath == null ? "" : tlsKeystorePath;
+            this.tlsKeystorePassword = tlsKeystorePassword == null ? "" : tlsKeystorePassword;
+            this.tlsKeyPassword = tlsKeyPassword == null ? "" : tlsKeyPassword;
+            this.tlsKeystoreType = tlsKeystoreType == null ? "PKCS12" : tlsKeystoreType;
         }
 
         public boolean isEnabled() {
@@ -83,6 +98,26 @@ public final class SinkholeConfig {
 
         public int getCaptureMaxBytes() {
             return captureMaxBytes;
+        }
+
+        public boolean isTlsEnabled() {
+            return tlsEnabled;
+        }
+
+        public String getTlsKeystorePath() {
+            return tlsKeystorePath;
+        }
+
+        public String getTlsKeystorePassword() {
+            return tlsKeystorePassword;
+        }
+
+        public String getTlsKeyPassword() {
+            return tlsKeyPassword;
+        }
+
+        public String getTlsKeystoreType() {
+            return tlsKeystoreType;
         }
     }
 

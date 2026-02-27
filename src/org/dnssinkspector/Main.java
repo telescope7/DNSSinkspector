@@ -16,7 +16,7 @@ import org.dnssinkspector.logging.EventLogger;
 import org.dnssinkspector.logging.JsonlEventLogger;
 import org.dnssinkspector.logging.SanitizingEventLogger;
 import org.dnssinkspector.logging.TsvEventLogger;
-import org.dnssinkspector.protocol.AbstractTcpCaptureServer;
+import org.dnssinkspector.protocol.CaptureService;
 import org.dnssinkspector.protocol.FtpCaptureServer;
 import org.dnssinkspector.protocol.HttpCaptureServer;
 import org.dnssinkspector.protocol.SmtpCaptureServer;
@@ -44,7 +44,7 @@ public final class Main {
                             sanitizedExcludedFields),
                     new TsvEventLogger(config.getCleanTsvLogPath(), sanitizedExcludedFields)));
             DnsServer dnsServer = new DnsServer(config, eventLogger);
-            List<AbstractTcpCaptureServer> tcpServers = new ArrayList<>();
+            List<CaptureService> tcpServers = new ArrayList<>();
 
             if (config.getHttpConfig().isEnabled()) {
                 tcpServers.add(new HttpCaptureServer(config.getHttpConfig(), eventLogger));
@@ -57,7 +57,7 @@ public final class Main {
             }
 
             try {
-                for (AbstractTcpCaptureServer tcpServer : tcpServers) {
+                for (CaptureService tcpServer : tcpServers) {
                     tcpServer.start();
                     System.out.printf(
                             "Starting %s listener on %s:%d%n",
@@ -66,7 +66,7 @@ public final class Main {
                             tcpServer.getConfig().getListenPort());
                 }
             } catch (IOException e) {
-                for (AbstractTcpCaptureServer tcpServer : tcpServers) {
+                for (CaptureService tcpServer : tcpServers) {
                     tcpServer.stop();
                 }
                 eventLogger.close();
@@ -75,7 +75,7 @@ public final class Main {
 
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 dnsServer.stop();
-                for (AbstractTcpCaptureServer tcpServer : tcpServers) {
+                for (CaptureService tcpServer : tcpServers) {
                     tcpServer.stop();
                 }
                 try {

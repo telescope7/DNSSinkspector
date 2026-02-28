@@ -1,5 +1,7 @@
 package org.dnssinkspector.protocol;
 
+import java.util.Map;
+
 public final class TcpSessionCapture {
     private final String username;
     private final String password;
@@ -9,6 +11,7 @@ public final class TcpSessionCapture {
     private final boolean truncated;
     private final String decision;
     private final String error;
+    private final Map<String, Object> extraFields;
 
     public TcpSessionCapture(
             String username,
@@ -19,6 +22,28 @@ public final class TcpSessionCapture {
             boolean truncated,
             String decision,
             String error) {
+        this(
+                username,
+                password,
+                dataText,
+                dataBase64,
+                bytesCaptured,
+                truncated,
+                decision,
+                error,
+                Map.of());
+    }
+
+    public TcpSessionCapture(
+            String username,
+            String password,
+            String dataText,
+            String dataBase64,
+            int bytesCaptured,
+            boolean truncated,
+            String decision,
+            String error,
+            Map<String, Object> extraFields) {
         this.username = username;
         this.password = password;
         this.dataText = dataText;
@@ -27,6 +52,7 @@ public final class TcpSessionCapture {
         this.truncated = truncated;
         this.decision = decision;
         this.error = error;
+        this.extraFields = extraFields == null ? Map.of() : Map.copyOf(extraFields);
     }
 
     public String getUsername() {
@@ -59,5 +85,9 @@ public final class TcpSessionCapture {
 
     public String getError() {
         return error;
+    }
+
+    public Map<String, Object> getExtraFields() {
+        return extraFields;
     }
 }

@@ -43,14 +43,23 @@ public final class HttpCaptureServer implements CaptureService {
 
     private final TcpServiceConfig config;
     private final EventLogger eventLogger;
+    private final String protocolName;
     private final AtomicLong sessionCounter = new AtomicLong(0);
 
     private HttpServer httpServer;
     private ExecutorService executor;
 
     public HttpCaptureServer(TcpServiceConfig config, EventLogger eventLogger) {
+        this(config, eventLogger, null);
+    }
+
+    public HttpCaptureServer(TcpServiceConfig config, EventLogger eventLogger, String protocolNameOverride) {
         this.config = config;
         this.eventLogger = eventLogger;
+        String fallbackName = config.isTlsEnabled() ? "HTTPS" : "HTTP";
+        this.protocolName = protocolNameOverride == null || protocolNameOverride.isBlank()
+                ? fallbackName
+                : protocolNameOverride;
     }
 
     @Override
@@ -88,7 +97,7 @@ public final class HttpCaptureServer implements CaptureService {
 
     @Override
     public String getProtocolName() {
-        return config.isTlsEnabled() ? "HTTPS" : "HTTP";
+        return protocolName;
     }
 
     @Override

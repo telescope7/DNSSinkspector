@@ -18,9 +18,14 @@ import org.dnssinkspector.logging.EventLogger;
 import org.dnssinkspector.logging.JsonlEventLogger;
 import org.dnssinkspector.logging.SanitizingEventLogger;
 import org.dnssinkspector.logging.TsvEventLogger;
+import org.dnssinkspector.protocol.BinaryCaptureServer;
 import org.dnssinkspector.protocol.CaptureService;
 import org.dnssinkspector.protocol.FtpCaptureServer;
 import org.dnssinkspector.protocol.HttpCaptureServer;
+import org.dnssinkspector.protocol.ImapCaptureServer;
+import org.dnssinkspector.protocol.LdapCaptureServer;
+import org.dnssinkspector.protocol.Pop3CaptureServer;
+import org.dnssinkspector.protocol.SmbCaptureServer;
 import org.dnssinkspector.protocol.SmtpCaptureServer;
 
 public final class Main {
@@ -56,10 +61,65 @@ public final class Main {
                 tcpServers.add(new HttpCaptureServer(config.getHttpConfig(), eventLogger));
             }
             if (config.getSmtpConfig().isEnabled()) {
-                tcpServers.add(new SmtpCaptureServer(config.getSmtpConfig(), eventLogger));
+                tcpServers.add(new SmtpCaptureServer(
+                        config.getSmtpConfig(),
+                        eventLogger,
+                        config.getSmtpMessageDir()));
             }
             if (config.getFtpConfig().isEnabled()) {
                 tcpServers.add(new FtpCaptureServer(config.getFtpConfig(), eventLogger));
+            }
+            if (config.getImapConfig().isEnabled()) {
+                tcpServers.add(new ImapCaptureServer(config.getImapConfig(), eventLogger));
+            }
+            if (config.getImapsConfig().isEnabled()) {
+                tcpServers.add(new BinaryCaptureServer("IMAPS", config.getImapsConfig(), eventLogger, null));
+            }
+            if (config.getPop3Config().isEnabled()) {
+                tcpServers.add(new Pop3CaptureServer(config.getPop3Config(), eventLogger));
+            }
+            if (config.getPop3sConfig().isEnabled()) {
+                tcpServers.add(new BinaryCaptureServer("POP3S", config.getPop3sConfig(), eventLogger, null));
+            }
+            if (config.getSshConfig().isEnabled()) {
+                tcpServers.add(new BinaryCaptureServer(
+                        "SSH",
+                        config.getSshConfig(),
+                        eventLogger,
+                        "SSH-2.0-OpenSSH_9.0 DNSSinkspector\r\n"));
+            }
+            if (config.getLdapConfig().isEnabled()) {
+                tcpServers.add(new LdapCaptureServer(config.getLdapConfig(), eventLogger));
+            }
+            if (config.getLdapsConfig().isEnabled()) {
+                tcpServers.add(new BinaryCaptureServer("LDAPS", config.getLdapsConfig(), eventLogger, null));
+            }
+            if (config.getKerberosConfig().isEnabled()) {
+                tcpServers.add(new BinaryCaptureServer("KERBEROS", config.getKerberosConfig(), eventLogger, null));
+            }
+            if (config.getSmbConfig().isEnabled()) {
+                tcpServers.add(new SmbCaptureServer(config.getSmbConfig(), eventLogger));
+            }
+            if (config.getRdpConfig().isEnabled()) {
+                tcpServers.add(new BinaryCaptureServer("RDP", config.getRdpConfig(), eventLogger, null));
+            }
+            if (config.getRpcConfig().isEnabled()) {
+                tcpServers.add(new BinaryCaptureServer("MSRPC", config.getRpcConfig(), eventLogger, null));
+            }
+            if (config.getNetbiosConfig().isEnabled()) {
+                tcpServers.add(new BinaryCaptureServer("NETBIOS-SSN", config.getNetbiosConfig(), eventLogger, null));
+            }
+            if (config.getWinrmHttpConfig().isEnabled()) {
+                tcpServers.add(new HttpCaptureServer(
+                        config.getWinrmHttpConfig(),
+                        eventLogger,
+                        "WINRM-HTTP"));
+            }
+            if (config.getWinrmHttpsConfig().isEnabled()) {
+                tcpServers.add(new HttpCaptureServer(
+                        config.getWinrmHttpsConfig(),
+                        eventLogger,
+                        "WINRM-HTTPS"));
             }
 
             try {
@@ -97,6 +157,9 @@ public final class Main {
             System.out.printf("Full TSV log file: %s%n", config.getTsvLogPath().toAbsolutePath());
             System.out.printf("Clean JSONL log file: %s%n", config.getCleanJsonLogPath().toAbsolutePath());
             System.out.printf("Clean TSV log file: %s%n", config.getCleanTsvLogPath().toAbsolutePath());
+            if (config.getSmtpConfig().isEnabled()) {
+                System.out.printf("SMTP message directory: %s%n", config.getSmtpMessageDir().toAbsolutePath());
+            }
             if (maxmindAsnDbPath.isPresent()) {
                 System.out.printf("MaxMind ASN DB: %s%n", maxmindAsnDbPath.get().toAbsolutePath());
             }

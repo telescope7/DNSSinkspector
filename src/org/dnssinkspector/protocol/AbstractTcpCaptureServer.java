@@ -155,6 +155,9 @@ public abstract class AbstractTcpCaptureServer implements CaptureService {
         event.put("truncated", capture != null && capture.isTruncated());
         event.put("error", capture == null ? "No capture result" : capture.getError());
         event.put("latency_ms", latencyMs);
+        if (capture != null && !capture.getExtraFields().isEmpty()) {
+            event.putAll(capture.getExtraFields());
+        }
         eventLogger.logEvent(event);
     }
 

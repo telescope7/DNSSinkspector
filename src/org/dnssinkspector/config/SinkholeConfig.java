@@ -130,9 +130,24 @@ public final class SinkholeConfig {
     private final Path cleanJsonLogPath;
     private final Path cleanTsvLogPath;
     private final Path maxmindAsnDbPath;
+    private final Path smtpMessageDir;
     private final TcpServiceConfig httpConfig;
     private final TcpServiceConfig smtpConfig;
     private final TcpServiceConfig ftpConfig;
+    private final TcpServiceConfig imapConfig;
+    private final TcpServiceConfig imapsConfig;
+    private final TcpServiceConfig pop3Config;
+    private final TcpServiceConfig pop3sConfig;
+    private final TcpServiceConfig sshConfig;
+    private final TcpServiceConfig ldapConfig;
+    private final TcpServiceConfig ldapsConfig;
+    private final TcpServiceConfig kerberosConfig;
+    private final TcpServiceConfig smbConfig;
+    private final TcpServiceConfig rdpConfig;
+    private final TcpServiceConfig rpcConfig;
+    private final TcpServiceConfig netbiosConfig;
+    private final TcpServiceConfig winrmHttpConfig;
+    private final TcpServiceConfig winrmHttpsConfig;
     private final Map<String, Zone> zonesByDomain;
 
     public SinkholeConfig(
@@ -145,9 +160,24 @@ public final class SinkholeConfig {
             Path cleanJsonLogPath,
             Path cleanTsvLogPath,
             Path maxmindAsnDbPath,
+            Path smtpMessageDir,
             TcpServiceConfig httpConfig,
             TcpServiceConfig smtpConfig,
             TcpServiceConfig ftpConfig,
+            TcpServiceConfig imapConfig,
+            TcpServiceConfig imapsConfig,
+            TcpServiceConfig pop3Config,
+            TcpServiceConfig pop3sConfig,
+            TcpServiceConfig sshConfig,
+            TcpServiceConfig ldapConfig,
+            TcpServiceConfig ldapsConfig,
+            TcpServiceConfig kerberosConfig,
+            TcpServiceConfig smbConfig,
+            TcpServiceConfig rdpConfig,
+            TcpServiceConfig rpcConfig,
+            TcpServiceConfig netbiosConfig,
+            TcpServiceConfig winrmHttpConfig,
+            TcpServiceConfig winrmHttpsConfig,
             List<Zone> zones) {
         this.listenAddress = listenAddress;
         this.listenPort = listenPort;
@@ -158,9 +188,24 @@ public final class SinkholeConfig {
         this.cleanJsonLogPath = cleanJsonLogPath;
         this.cleanTsvLogPath = cleanTsvLogPath;
         this.maxmindAsnDbPath = maxmindAsnDbPath;
+        this.smtpMessageDir = smtpMessageDir;
         this.httpConfig = httpConfig;
         this.smtpConfig = smtpConfig;
         this.ftpConfig = ftpConfig;
+        this.imapConfig = imapConfig;
+        this.imapsConfig = imapsConfig;
+        this.pop3Config = pop3Config;
+        this.pop3sConfig = pop3sConfig;
+        this.sshConfig = sshConfig;
+        this.ldapConfig = ldapConfig;
+        this.ldapsConfig = ldapsConfig;
+        this.kerberosConfig = kerberosConfig;
+        this.smbConfig = smbConfig;
+        this.rdpConfig = rdpConfig;
+        this.rpcConfig = rpcConfig;
+        this.netbiosConfig = netbiosConfig;
+        this.winrmHttpConfig = winrmHttpConfig;
+        this.winrmHttpsConfig = winrmHttpsConfig;
 
         Map<String, Zone> zoneMap = new HashMap<>();
         for (Zone zone : zones) {
@@ -205,6 +250,10 @@ public final class SinkholeConfig {
         return Optional.ofNullable(maxmindAsnDbPath);
     }
 
+    public Path getSmtpMessageDir() {
+        return smtpMessageDir;
+    }
+
     public TcpServiceConfig getHttpConfig() {
         return httpConfig;
     }
@@ -215,6 +264,62 @@ public final class SinkholeConfig {
 
     public TcpServiceConfig getFtpConfig() {
         return ftpConfig;
+    }
+
+    public TcpServiceConfig getImapConfig() {
+        return imapConfig;
+    }
+
+    public TcpServiceConfig getImapsConfig() {
+        return imapsConfig;
+    }
+
+    public TcpServiceConfig getPop3Config() {
+        return pop3Config;
+    }
+
+    public TcpServiceConfig getPop3sConfig() {
+        return pop3sConfig;
+    }
+
+    public TcpServiceConfig getSshConfig() {
+        return sshConfig;
+    }
+
+    public TcpServiceConfig getLdapConfig() {
+        return ldapConfig;
+    }
+
+    public TcpServiceConfig getLdapsConfig() {
+        return ldapsConfig;
+    }
+
+    public TcpServiceConfig getKerberosConfig() {
+        return kerberosConfig;
+    }
+
+    public TcpServiceConfig getSmbConfig() {
+        return smbConfig;
+    }
+
+    public TcpServiceConfig getRdpConfig() {
+        return rdpConfig;
+    }
+
+    public TcpServiceConfig getRpcConfig() {
+        return rpcConfig;
+    }
+
+    public TcpServiceConfig getNetbiosConfig() {
+        return netbiosConfig;
+    }
+
+    public TcpServiceConfig getWinrmHttpConfig() {
+        return winrmHttpConfig;
+    }
+
+    public TcpServiceConfig getWinrmHttpsConfig() {
+        return winrmHttpsConfig;
     }
 
     public Map<String, Zone> getZonesByDomain() {

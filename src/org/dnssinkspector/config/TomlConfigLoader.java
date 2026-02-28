@@ -29,6 +29,20 @@ public final class TomlConfigLoader {
         Map<String, Object> httpTable = new HashMap<>();
         Map<String, Object> smtpTable = new HashMap<>();
         Map<String, Object> ftpTable = new HashMap<>();
+        Map<String, Object> imapTable = new HashMap<>();
+        Map<String, Object> imapsTable = new HashMap<>();
+        Map<String, Object> pop3Table = new HashMap<>();
+        Map<String, Object> pop3sTable = new HashMap<>();
+        Map<String, Object> sshTable = new HashMap<>();
+        Map<String, Object> ldapTable = new HashMap<>();
+        Map<String, Object> ldapsTable = new HashMap<>();
+        Map<String, Object> kerberosTable = new HashMap<>();
+        Map<String, Object> smbTable = new HashMap<>();
+        Map<String, Object> rdpTable = new HashMap<>();
+        Map<String, Object> rpcTable = new HashMap<>();
+        Map<String, Object> netbiosTable = new HashMap<>();
+        Map<String, Object> winrmHttpTable = new HashMap<>();
+        Map<String, Object> winrmHttpsTable = new HashMap<>();
         List<Map<String, Object>> zoneTables = new ArrayList<>();
         Map<String, Object> activeTable = new HashMap<>();
         String activeTableName = "";
@@ -66,6 +80,48 @@ public final class TomlConfigLoader {
                 } else if ("ftp".equals(tableName)) {
                     activeTable = ftpTable;
                     activeTableName = "ftp";
+                } else if ("imap".equals(tableName)) {
+                    activeTable = imapTable;
+                    activeTableName = "imap";
+                } else if ("imaps".equals(tableName)) {
+                    activeTable = imapsTable;
+                    activeTableName = "imaps";
+                } else if ("pop3".equals(tableName)) {
+                    activeTable = pop3Table;
+                    activeTableName = "pop3";
+                } else if ("pop3s".equals(tableName)) {
+                    activeTable = pop3sTable;
+                    activeTableName = "pop3s";
+                } else if ("ssh".equals(tableName)) {
+                    activeTable = sshTable;
+                    activeTableName = "ssh";
+                } else if ("ldap".equals(tableName)) {
+                    activeTable = ldapTable;
+                    activeTableName = "ldap";
+                } else if ("ldaps".equals(tableName)) {
+                    activeTable = ldapsTable;
+                    activeTableName = "ldaps";
+                } else if ("kerberos".equals(tableName)) {
+                    activeTable = kerberosTable;
+                    activeTableName = "kerberos";
+                } else if ("smb".equals(tableName)) {
+                    activeTable = smbTable;
+                    activeTableName = "smb";
+                } else if ("rdp".equals(tableName)) {
+                    activeTable = rdpTable;
+                    activeTableName = "rdp";
+                } else if ("rpc".equals(tableName)) {
+                    activeTable = rpcTable;
+                    activeTableName = "rpc";
+                } else if ("netbios".equals(tableName)) {
+                    activeTable = netbiosTable;
+                    activeTableName = "netbios";
+                } else if ("winrm_http".equals(tableName)) {
+                    activeTable = winrmHttpTable;
+                    activeTableName = "winrm_http";
+                } else if ("winrm_https".equals(tableName)) {
+                    activeTable = winrmHttpsTable;
+                    activeTableName = "winrm_https";
                 } else {
                     throw new IllegalArgumentException("Unsupported table at line " + lineNo + ": " + tableName);
                 }
@@ -107,6 +163,7 @@ public final class TomlConfigLoader {
         Path maxmindAsnDbPath = maxmindAsnDbPathRaw.trim().isEmpty()
                 ? null
                 : Paths.get(maxmindAsnDbPathRaw);
+        Path smtpMessageDir = Paths.get(getString(serverTable, "smtp_message_dir", "logs/smtp-messages"));
 
         String defaultResponseRaw = getString(serverTable, "default_response", "NXDOMAIN")
                 .toUpperCase(Locale.ROOT);
@@ -128,7 +185,8 @@ public final class TomlConfigLoader {
                 80,
                 5000,
                 16384,
-                true);
+                true,
+                false);
         SinkholeConfig.TcpServiceConfig smtpConfig = parseTcpServiceConfig(
                 "smtp",
                 smtpTable,
@@ -136,6 +194,7 @@ public final class TomlConfigLoader {
                 25,
                 8000,
                 32768,
+                false,
                 false);
         SinkholeConfig.TcpServiceConfig ftpConfig = parseTcpServiceConfig(
                 "ftp",
@@ -144,7 +203,134 @@ public final class TomlConfigLoader {
                 21,
                 8000,
                 16384,
+                false,
                 false);
+        SinkholeConfig.TcpServiceConfig imapConfig = parseTcpServiceConfig(
+                "imap",
+                imapTable,
+                listenAddress,
+                143,
+                8000,
+                32768,
+                false,
+                false);
+        SinkholeConfig.TcpServiceConfig imapsConfig = parseTcpServiceConfig(
+                "imaps",
+                imapsTable,
+                listenAddress,
+                993,
+                8000,
+                32768,
+                false,
+                false);
+        SinkholeConfig.TcpServiceConfig pop3Config = parseTcpServiceConfig(
+                "pop3",
+                pop3Table,
+                listenAddress,
+                110,
+                8000,
+                32768,
+                false,
+                false);
+        SinkholeConfig.TcpServiceConfig pop3sConfig = parseTcpServiceConfig(
+                "pop3s",
+                pop3sTable,
+                listenAddress,
+                995,
+                8000,
+                32768,
+                false,
+                false);
+        SinkholeConfig.TcpServiceConfig sshConfig = parseTcpServiceConfig(
+                "ssh",
+                sshTable,
+                listenAddress,
+                22,
+                8000,
+                16384,
+                false,
+                false);
+        SinkholeConfig.TcpServiceConfig ldapConfig = parseTcpServiceConfig(
+                "ldap",
+                ldapTable,
+                listenAddress,
+                389,
+                8000,
+                32768,
+                false,
+                false);
+        SinkholeConfig.TcpServiceConfig ldapsConfig = parseTcpServiceConfig(
+                "ldaps",
+                ldapsTable,
+                listenAddress,
+                636,
+                8000,
+                32768,
+                false,
+                false);
+        SinkholeConfig.TcpServiceConfig kerberosConfig = parseTcpServiceConfig(
+                "kerberos",
+                kerberosTable,
+                listenAddress,
+                88,
+                5000,
+                16384,
+                false,
+                false);
+        SinkholeConfig.TcpServiceConfig smbConfig = parseTcpServiceConfig(
+                "smb",
+                smbTable,
+                listenAddress,
+                445,
+                5000,
+                65536,
+                false,
+                false);
+        SinkholeConfig.TcpServiceConfig rdpConfig = parseTcpServiceConfig(
+                "rdp",
+                rdpTable,
+                listenAddress,
+                3389,
+                5000,
+                32768,
+                false,
+                false);
+        SinkholeConfig.TcpServiceConfig rpcConfig = parseTcpServiceConfig(
+                "rpc",
+                rpcTable,
+                listenAddress,
+                135,
+                5000,
+                32768,
+                false,
+                false);
+        SinkholeConfig.TcpServiceConfig netbiosConfig = parseTcpServiceConfig(
+                "netbios",
+                netbiosTable,
+                listenAddress,
+                139,
+                5000,
+                32768,
+                false,
+                false);
+        SinkholeConfig.TcpServiceConfig winrmHttpConfig = parseTcpServiceConfig(
+                "winrm_http",
+                winrmHttpTable,
+                listenAddress,
+                5985,
+                8000,
+                65536,
+                false,
+                false);
+        SinkholeConfig.TcpServiceConfig winrmHttpsConfig = parseTcpServiceConfig(
+                "winrm_https",
+                winrmHttpsTable,
+                listenAddress,
+                5986,
+                8000,
+                65536,
+                true,
+                true);
 
         List<Zone> zones = new ArrayList<>();
         for (int i = 0; i < zoneTables.size(); i++) {
@@ -175,9 +361,24 @@ public final class TomlConfigLoader {
                 cleanJsonLogPath,
                 cleanTsvLogPath,
                 maxmindAsnDbPath,
+                smtpMessageDir,
                 httpConfig,
                 smtpConfig,
                 ftpConfig,
+                imapConfig,
+                imapsConfig,
+                pop3Config,
+                pop3sConfig,
+                sshConfig,
+                ldapConfig,
+                ldapsConfig,
+                kerberosConfig,
+                smbConfig,
+                rdpConfig,
+                rpcConfig,
+                netbiosConfig,
+                winrmHttpConfig,
+                winrmHttpsConfig,
                 zones);
     }
 
@@ -405,13 +606,14 @@ public final class TomlConfigLoader {
             int defaultPort,
             int defaultReadTimeoutMs,
             int defaultCaptureMaxBytes,
-            boolean supportsTls) {
+            boolean supportsTls,
+            boolean defaultTlsEnabled) {
         boolean enabled = getBoolean(table, "enabled", false);
         String listenAddress = getString(table, "listen_address", defaultAddress);
         int listenPort = getInt(table, "listen_port", defaultPort);
         int readTimeoutMs = getInt(table, "read_timeout_ms", defaultReadTimeoutMs);
         int captureMaxBytes = getInt(table, "capture_max_bytes", defaultCaptureMaxBytes);
-        boolean tlsEnabled = getBoolean(table, "tls_enabled", false);
+        boolean tlsEnabled = getBoolean(table, "tls_enabled", defaultTlsEnabled);
         String tlsKeystorePath = getString(table, "tls_keystore_path", "");
         String tlsKeystorePassword = getString(table, "tls_keystore_password", "");
         String tlsKeyPassword = getString(table, "tls_key_password", "");
@@ -426,10 +628,10 @@ public final class TomlConfigLoader {
         if (captureMaxBytes < 256) {
             throw new IllegalArgumentException(tableName + ".capture_max_bytes must be >= 256");
         }
-        if (tlsEnabled && !supportsTls) {
+        if (enabled && tlsEnabled && !supportsTls) {
             throw new IllegalArgumentException(tableName + ".tls_enabled is not supported");
         }
-        if (tlsEnabled) {
+        if (enabled && tlsEnabled) {
             if (tlsKeystorePath.trim().isEmpty()) {
                 throw new IllegalArgumentException(tableName + ".tls_keystore_path is required when tls_enabled=true");
             }

@@ -3,11 +3,17 @@ package org.dnssinkspector.protocol;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.reflect.Constructor;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -65,15 +71,24 @@ import org.dnssinkspector.logging.EventLogger;
 import org.reactivestreams.Publisher;
 
 public final class SmtpCaptureServer implements CaptureService {
+    private static final DateTimeFormatter SMTP_MESSAGE_TS_FORMAT = DateTimeFormatter.ISO_INSTANT;
+
     private final TcpServiceConfig config;
     private final EventLogger eventLogger;
+    private final Path messageOutputDir;
     private final AtomicLong sessionCounter = new AtomicLong(0);
+    private final AtomicLong messageCounter = new AtomicLong(0);
 
     private SMTPServer smtpServer;
 
     public SmtpCaptureServer(TcpServiceConfig config, EventLogger eventLogger) {
+        this(config, eventLogger, Path.of("logs", "smtp-messages"));
+    }
+
+    public SmtpCaptureServer(TcpServiceConfig config, EventLogger eventLogger, Path messageOutputDir) {
         this.config = config;
         this.eventLogger = eventLogger;
+        this.messageOutputDir = messageOutputDir;
     }
 
     @Override
@@ -81,9 +96,15 @@ public final class SmtpCaptureServer implements CaptureService {
         if (smtpServer != null && smtpServer.isStarted()) {
             return;
         }
+        Files.createDirectories(messageOutputDir);
 
         NoopMetricFactory metricFactory = new NoopMetricFactory();
-        SmtpCaptureHook captureHook = new SmtpCaptureHook(config, eventLogger, sessionCounter);
+        SmtpCaptureHook captureHook = new SmtpCaptureHook(
+                config,
+                eventLogger,
+                sessionCounter,
+                messageCounter,
+                messageOutputDir);
         SMTPServer server = new SMTPServer(new SmtpMetricsImpl(metricFactory));
         server.setProtocolHandlerLoader(new SmtpProtocolHandlerLoader(metricFactory, captureHook));
 
@@ -235,11 +256,20 @@ public final class SmtpCaptureServer implements CaptureService {
         private final TcpServiceConfig config;
         private final EventLogger eventLogger;
         private final AtomicLong sessionCounter;
+        private final AtomicLong messageCounter;
+        private final Path messageOutputDir;
 
-        private SmtpCaptureHook(TcpServiceConfig config, EventLogger eventLogger, AtomicLong sessionCounter) {
+        private SmtpCaptureHook(
+                TcpServiceConfig config,
+                EventLogger eventLogger,
+                AtomicLong sessionCounter,
+                AtomicLong messageCounter,
+                Path messageOutputDir) {
             this.config = config;
             this.eventLogger = eventLogger;
             this.sessionCounter = sessionCounter;
+            this.messageCounter = messageCounter;
+            this.messageOutputDir = messageOutputDir;
         }
 
         @Override
@@ -271,6 +301,11 @@ public final class SmtpCaptureServer implements CaptureService {
             event.put("decision", state.resolveDecision());
             event.put("username", state.getUsername());
             event.put("password", state.getPassword());
+            event.put("smtp_mail_from", state.getMailFrom());
+            event.put("smtp_rcpt_to", state.getRecipients());
+            event.put("smtp_message_path", state.getMessagePath());
+            event.put("smtp_message_size_bytes", state.getMessageSizeBytes());
+            event.put("smtp_message_error", state.getMessageFileError());
             event.put("data_text", new String(payload, StandardCharsets.UTF_8));
             event.put("data_base64", Base64.getEncoder().encodeToString(payload));
             event.put("request_size_bytes", payload.length);
@@ -288,14 +323,19 @@ public final class SmtpCaptureServer implements CaptureService {
 
         @Override
         public HookResult doMail(SMTPSession session, MaybeSender sender) {
-            appendLine(stateFor(session), "MAIL FROM:<" + (sender == null ? "" : sender.asString()) + ">");
+            CaptureState state = stateFor(session);
+            String senderValue = sender == null ? "" : sender.asString();
+            state.setMailFrom(senderValue);
+            appendLine(state, "MAIL FROM:<" + senderValue + ">");
             return HookResult.OK;
         }
 
         @Override
         public HookResult doRcpt(SMTPSession session, MaybeSender sender, MailAddress recipient, Map<String, String> parameters) {
+            CaptureState state = stateFor(session);
             String recipientValue = recipient == null ? "" : recipient.asString();
-            appendLine(stateFor(session), "RCPT TO:<" + recipientValue + ">");
+            state.addRecipient(recipientValue);
+            appendLine(state, "RCPT TO:<" + recipientValue + ">");
             return HookResult.OK;
         }
 
@@ -324,14 +364,52 @@ public final class SmtpCaptureServer implements CaptureService {
             appendLine(state, "DATA");
             try (InputStream in = mailEnvelope.getMessageInputStream()) {
                 byte[] buffer = new byte[1024];
-                while (true) {
-                    int read = in.read(buffer);
-                    if (read == -1) {
-                        break;
+                Path messagePath = nextMessagePath(state);
+                long messageBytesWritten = 0L;
+                OutputStream messageOut = null;
+                boolean messageFileOpened = false;
+                try {
+                    messageOut = Files.newOutputStream(
+                            messagePath,
+                            StandardOpenOption.CREATE_NEW,
+                            StandardOpenOption.WRITE);
+                    messageFileOpened = true;
+                } catch (IOException e) {
+                    state.setMessageFileError("Unable to create SMTP message file: " + e.getMessage());
+                }
+                try {
+                    while (true) {
+                        int read = in.read(buffer);
+                        if (read == -1) {
+                            break;
+                        }
+                        state.append(buffer, 0, read, config.getCaptureMaxBytes());
+                        if (messageOut != null) {
+                            try {
+                                messageOut.write(buffer, 0, read);
+                                messageBytesWritten += read;
+                            } catch (IOException e) {
+                                state.setMessageFileError("SMTP message write error: " + e.getMessage());
+                                try {
+                                    messageOut.close();
+                                } catch (IOException closeError) {
+                                    // Ignore close error after write failure.
+                                }
+                                messageOut = null;
+                            }
+                        }
                     }
-                    state.append(buffer, 0, read, config.getCaptureMaxBytes());
-                    if (state.isTruncated()) {
-                        break;
+                } finally {
+                    if (messageOut != null) {
+                        try {
+                            messageOut.flush();
+                            messageOut.close();
+                        } catch (IOException e) {
+                            state.setMessageFileError("SMTP message close error: " + e.getMessage());
+                        }
+                    }
+                    if (messageFileOpened) {
+                        state.setMessageFile(messagePath, messageBytesWritten);
                     }
                 }
             } catch (IOException e) {
@@ -371,6 +449,15 @@ public final class SmtpCaptureServer implements CaptureService {
             state.append(bytes, 0, bytes.length, config.getCaptureMaxBytes());
         }
 
+        private Path nextMessagePath(CaptureState state) {
+            String ts = SMTP_MESSAGE_TS_FORMAT.format(Instant.now())
+                    .replace(":", "")
+                    .replace(".", "");
+            String safeSession = state.getSessionId().replaceAll("[^A-Za-z0-9._-]", "_");
+            long fileId = messageCounter.incrementAndGet();
+            return messageOutputDir.resolve(ts + "-" + safeSession + "-" + fileId + ".eml");
+        }
+
         private static HookResult disconnectingOk(String description) {
             return HookResult.builder()
                     .hookReturnCode(HookReturnCode.disconnected(HookReturnCode.Action.OK))
@@ -401,12 +488,17 @@ public final class SmtpCaptureServer implements CaptureService {
         private final String sessionId;
         private final long startedAtNanos;
         private final ByteArrayOutputStream payload = new ByteArrayOutputStream();
+        private final List<String> recipients = new ArrayList<>();
         private final AtomicBoolean logged = new AtomicBoolean(false);
 
         private String username;
         private String password;
+        private String mailFrom;
         private String decision;
         private String error;
+        private String messagePath;
+        private long messageSizeBytes;
+        private String messageFileError;
         private boolean truncated;
 
         private CaptureState(String sessionId, long startedAtNanos) {
@@ -437,6 +529,28 @@ public final class SmtpCaptureServer implements CaptureService {
             this.password = password;
         }
 
+        private synchronized void setMailFrom(String mailFrom) {
+            this.mailFrom = mailFrom;
+        }
+
+        private synchronized void addRecipient(String recipient) {
+            if (recipient == null || recipient.isBlank()) {
+                return;
+            }
+            this.recipients.add(recipient);
+        }
+
+        private synchronized void setMessageFile(Path path, long sizeBytes) {
+            if (path != null) {
+                this.messagePath = path.toString();
+            }
+            this.messageSizeBytes = sizeBytes;
+        }
+
+        private synchronized void setMessageFileError(String messageFileError) {
+            this.messageFileError = messageFileError;
+        }
+
         private synchronized void setDecision(String decision) {
             this.decision = decision;
         }
@@ -459,6 +573,26 @@ public final class SmtpCaptureServer implements CaptureService {
 
         private synchronized String getPassword() {
             return password;
+        }
+
+        private synchronized String getMailFrom() {
+            return mailFrom;
+        }
+
+        private synchronized List<String> getRecipients() {
+            return List.copyOf(recipients);
+        }
+
+        private synchronized String getMessagePath() {
+            return messagePath;
+        }
+
+        private synchronized long getMessageSizeBytes() {
+            return messageSizeBytes;
+        }
+
+        private synchronized String getMessageFileError() {
+            return messageFileError;
         }
 
         private synchronized String getError() {

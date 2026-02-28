@@ -15,6 +15,9 @@ clean_tsv_log_path = "logs/events-clean.tsv"
 # Default in code is "GeoLite2-ASN.mmdb" at project root.
 maxmind_asn_db_path = "GeoLite2-ASN.mmdb"
 
+# Directory where captured SMTP DATA payloads are written as individual .eml files.
+smtp_message_dir = "logs/smtp-messages"
+
 # Behavior for domains that do not match any zone:
 # - "NXDOMAIN": return DNS NXDOMAIN
 # - "NODATA": return NOERROR with no answers
@@ -49,6 +52,110 @@ listen_address = "0.0.0.0"
 listen_port = 21
 read_timeout_ms = 8000
 capture_max_bytes = 16384
+
+# Priority 1 credential-heavy protocols
+[imap]
+enabled = false
+listen_address = "0.0.0.0"
+listen_port = 143
+read_timeout_ms = 8000
+capture_max_bytes = 32768
+
+[imaps]
+enabled = false
+listen_address = "0.0.0.0"
+listen_port = 993
+read_timeout_ms = 8000
+capture_max_bytes = 32768
+
+[pop3]
+enabled = false
+listen_address = "0.0.0.0"
+listen_port = 110
+read_timeout_ms = 8000
+capture_max_bytes = 32768
+
+[pop3s]
+enabled = false
+listen_address = "0.0.0.0"
+listen_port = 995
+read_timeout_ms = 8000
+capture_max_bytes = 32768
+
+[ssh]
+enabled = true
+listen_address = "0.0.0.0"
+listen_port = 22
+read_timeout_ms = 8000
+capture_max_bytes = 16384
+
+[ldap]
+enabled = true
+listen_address = "0.0.0.0"
+listen_port = 389
+read_timeout_ms = 8000
+capture_max_bytes = 32768
+
+[ldaps]
+enabled = false
+listen_address = "0.0.0.0"
+listen_port = 636
+read_timeout_ms = 8000
+capture_max_bytes = 32768
+
+[kerberos]
+enabled = false
+listen_address = "0.0.0.0"
+listen_port = 88
+read_timeout_ms = 5000
+capture_max_bytes = 16384
+
+[smb]
+enabled = true
+listen_address = "0.0.0.0"
+listen_port = 445
+read_timeout_ms = 5000
+capture_max_bytes = 65536
+
+[rdp]
+enabled = false
+listen_address = "0.0.0.0"
+listen_port = 3389
+read_timeout_ms = 5000
+capture_max_bytes = 32768
+
+[rpc]
+enabled = false
+listen_address = "0.0.0.0"
+listen_port = 135
+read_timeout_ms = 5000
+capture_max_bytes = 32768
+
+[netbios]
+enabled = false
+listen_address = "0.0.0.0"
+listen_port = 139
+read_timeout_ms = 5000
+capture_max_bytes = 32768
+
+[winrm_http]
+enabled = false
+listen_address = "0.0.0.0"
+listen_port = 5985
+read_timeout_ms = 8000
+capture_max_bytes = 65536
+
+[winrm_https]
+enabled = false
+listen_address = "0.0.0.0"
+listen_port = 5986
+read_timeout_ms = 8000
+capture_max_bytes = 65536
+tls_enabled = true
+# tls_keystore_path = "config/https-keystore.p12"
+# tls_keystore_password = "changeit"
+# tls_key_password = "changeit"
+# tls_keystore_type = "PKCS12"
 
 [[zones]]
 domain = "malware-test.local"

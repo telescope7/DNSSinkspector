@@ -81,6 +81,24 @@ Run from extracted bundle:
 ./bin/run.sh
 ```
 
+## Linux Port Logging Setup
+For host-level Linux traffic logging (all ports/protocol families with direction, IPs, ports, protocol), use:
+
+```bash
+sudo ./scripts/setup-linux-port-logging.sh install
+```
+
+Management commands:
+```bash
+sudo ./scripts/setup-linux-port-logging.sh status
+sudo ./scripts/setup-linux-port-logging.sh remove
+```
+
+Output files:
+- `/var/log/dnssinkspector/port-events.log`
+- `/etc/rsyslog.d/49-dnssinkspector-portlog.conf`
+- `/etc/logrotate.d/dnssinkspector-portlog`
+
 Note: ports below `1024` (`80/25/21`) usually require elevated privileges. For local unprivileged testing, set higher ports (for example `8080/2525/2121`) in TOML.
 The same applies to other low ports (`22/88/110/135/139/143/389/445/636/993/995`).
 

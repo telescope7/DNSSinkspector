@@ -99,6 +99,9 @@ Output files:
 - `/etc/rsyslog.d/49-dnssinkspector-portlog.conf`
 - `/etc/logrotate.d/dnssinkspector-portlog`
 
+Detailed script block-by-block documentation:
+- [`scripts/setup-linux-port-logging.md`](/Users/mthomas/eclipse-workspace/DNSSinkspector/scripts/setup-linux-port-logging.md)
+
 Note: ports below `1024` (`80/25/21`) usually require elevated privileges. For local unprivileged testing, set higher ports (for example `8080/2525/2121`) in TOML.
 The same applies to other low ports (`22/88/110/135/139/143/389/445/636/993/995`).
 

@@ -3,13 +3,21 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_HOME="$(cd "${SCRIPT_DIR}/.." && pwd)"
+cd "${APP_HOME}"
 
 if ! command -v java >/dev/null 2>&1; then
     echo "java not found on PATH" >&2
     exit 1
 fi
 
-JAR_FILE="$(find "${APP_HOME}/lib" -maxdepth 1 -type f -name '*.jar' | sort | head -n 1 || true)"
+JAR_FILE=""
+while IFS= read -r candidate; do
+    if [[ -s "${candidate}" ]]; then
+        JAR_FILE="${candidate}"
+        break
+    fi
+done < <(find "${APP_HOME}/lib" -maxdepth 1 -type f -name '*.jar' ! -name '._*' | sort)
+
 if [[ -z "${JAR_FILE}" ]]; then
     echo "No runnable jar found under ${APP_HOME}/lib" >&2
     exit 1

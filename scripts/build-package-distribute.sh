@@ -44,11 +44,43 @@ cp "${PROJECT_ROOT}/config/sinkhole.toml" "${BUNDLE_DIR}/config/sinkhole.toml"
 cp "${PROJECT_ROOT}/README.md" "${BUNDLE_DIR}/README.md"
 chmod +x "${BUNDLE_DIR}/bin/run.sh"
 
+# Include default MaxMind ASN database when present.
+if [[ -f "${PROJECT_ROOT}/GeoLite2-ASN.mmdb" ]]; then
+    cp "${PROJECT_ROOT}/GeoLite2-ASN.mmdb" "${BUNDLE_DIR}/GeoLite2-ASN.mmdb"
+else
+    echo "Warning: GeoLite2-ASN.mmdb not found at project root; ASN enrichment may fail at runtime." >&2
+fi
+
+# Remove common macOS metadata files if they exist in the staging tree.
+find "${BUNDLE_DIR}" -name '.DS_Store' -type f -delete || true
+find "${BUNDLE_DIR}" -name '._*' -type f -delete || true
+
+# On macOS, clear xattrs so tar/zip don't carry Apple provenance/resource metadata.
+if command -v xattr >/dev/null 2>&1; then
+    while IFS= read -r -d '' path; do
+        xattr -c "${path}" 2>/dev/null || true
+    done < <(find "${BUNDLE_DIR}" -print0)
+fi
+
 rm -f "${DIST_ROOT}/${BUNDLE_NAME}.zip" "${DIST_ROOT}/${BUNDLE_NAME}.tar.gz"
 (
     cd "${DIST_ROOT}"
-    zip -qr "${BUNDLE_NAME}.zip" "${BUNDLE_NAME}"
-    tar -czf "${BUNDLE_NAME}.tar.gz" "${BUNDLE_NAME}"
+    # -X strips extra file attributes; -x filters known macOS archive noise.
+    COPYFILE_DISABLE=1 zip -X -qr "${BUNDLE_NAME}.zip" "${BUNDLE_NAME}" \
+        -x "*/.DS_Store" "*/._*" "__MACOSX/*"
+
+    TAR_EXTRA_OPTS=""
+    if tar --help 2>&1 | grep -q -- "--no-xattrs"; then
+        TAR_EXTRA_OPTS="${TAR_EXTRA_OPTS} --no-xattrs"
+    fi
+    if tar --help 2>&1 | grep -q -- "--disable-copyfile"; then
+        TAR_EXTRA_OPTS="${TAR_EXTRA_OPTS} --disable-copyfile"
+    elif tar --help 2>&1 | grep -q -- "--no-mac-metadata"; then
+        TAR_EXTRA_OPTS="${TAR_EXTRA_OPTS} --no-mac-metadata"
+    fi
+
+    # shellcheck disable=SC2086
+    COPYFILE_DISABLE=1 tar ${TAR_EXTRA_OPTS} -czf "${BUNDLE_NAME}.tar.gz" "${BUNDLE_NAME}"
 )
 
 echo "Distribution created:"

@@ -1,13 +1,17 @@
 package org.dnssinkspector;
 
 import java.io.IOException;
+import java.net.BindException;
 import java.net.SocketException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.stream.Collectors;
 
 import org.dnssinkspector.config.SinkholeConfig;
 import org.dnssinkspector.config.TomlConfigLoader;
@@ -56,6 +60,10 @@ public final class Main {
                     : baseLogger;
             DnsServer dnsServer = new DnsServer(config, eventLogger);
             List<CaptureService> tcpServers = new ArrayList<>();
+            List<CaptureService> startedTcpServers = new ArrayList<>();
+            Set<Integer> listeningPorts = new LinkedHashSet<>();
+            List<String> startupFailures = new ArrayList<>();
+            boolean dnsStarted = false;
 
             if (config.getHttpConfig().isEnabled()) {
                 tcpServers.add(new HttpCaptureServer(config.getHttpConfig(), eventLogger));
@@ -122,26 +130,54 @@ public final class Main {
                         "WINRM-HTTPS"));
             }
 
-            try {
-                for (CaptureService tcpServer : tcpServers) {
+            for (CaptureService tcpServer : tcpServers) {
+                try {
                     tcpServer.start();
+                    startedTcpServers.add(tcpServer);
                     System.out.printf(
                             "Starting %s listener on %s:%d%n",
                             tcpServer.getProtocolName(),
                             tcpServer.getConfig().getListenAddress(),
                             tcpServer.getConfig().getListenPort());
+                    listeningPorts.add(tcpServer.getConfig().getListenPort());
+                } catch (BindException e) {
+                    IOException contextualError = withBindContext(tcpServer, e);
+                    startupFailures.add(contextualError.getMessage());
+                    System.err.println(contextualError.getMessage());
+                } catch (IOException e) {
+                    IOException contextualError = withStartContext(tcpServer, e);
+                    startupFailures.add(contextualError.getMessage());
+                    System.err.println(contextualError.getMessage());
+                } catch (RuntimeException e) {
+                    IOException contextualError = withStartContext(tcpServer, e);
+                    startupFailures.add(contextualError.getMessage());
+                    System.err.println(contextualError.getMessage());
                 }
-            } catch (IOException e) {
-                for (CaptureService tcpServer : tcpServers) {
-                    tcpServer.stop();
-                }
+            }
+            try {
+                dnsServer.bind();
+                dnsStarted = true;
+                listeningPorts.add(config.getListenPort());
+            } catch (BindException e) {
+                BindException contextualError = withDnsBindContext(config, e);
+                startupFailures.add(contextualError.getMessage());
+                System.err.println(contextualError.getMessage());
+            } catch (SocketException e) {
+                SocketException contextualError = withDnsStartContext(config, e);
+                startupFailures.add(contextualError.getMessage());
+                System.err.println(contextualError.getMessage());
+            }
+
+            if (!dnsStarted && startedTcpServers.isEmpty()) {
+                System.err.println("No listeners were started successfully. Exiting.");
                 eventLogger.close();
-                throw e;
+                System.exit(3);
+                return;
             }
 
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 dnsServer.stop();
-                for (CaptureService tcpServer : tcpServers) {
+                for (CaptureService tcpServer : startedTcpServers) {
                     tcpServer.stop();
                 }
                 try {
@@ -151,8 +187,13 @@ public final class Main {
                 }
             }));
 
-            System.out.printf("Starting DNSSinkspector on %s:%d%n",
-                    config.getListenAddress(), config.getListenPort());
+            if (dnsStarted) {
+                System.out.printf("Starting DNSSinkspector DNS listener on %s:%d%n",
+                        config.getListenAddress(), config.getListenPort());
+            } else {
+                System.out.printf("DNS listener not active on %s:%d%n",
+                        config.getListenAddress(), config.getListenPort());
+            }
             System.out.printf("Full JSONL log file: %s%n", config.getJsonLogPath().toAbsolutePath());
             System.out.printf("Full TSV log file: %s%n", config.getTsvLogPath().toAbsolutePath());
             System.out.printf("Clean JSONL log file: %s%n", config.getCleanJsonLogPath().toAbsolutePath());
@@ -163,11 +204,42 @@ public final class Main {
             if (maxmindAsnDbPath.isPresent()) {
                 System.out.printf("MaxMind ASN DB: %s%n", maxmindAsnDbPath.get().toAbsolutePath());
             }
-            dnsServer.start();
+            String listeningPortList = listeningPorts.stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(","));
+            List<String> logOutputs = new ArrayList<>();
+            logOutputs.add(config.getJsonLogPath().toAbsolutePath().toString());
+            logOutputs.add(config.getTsvLogPath().toAbsolutePath().toString());
+            logOutputs.add(config.getCleanJsonLogPath().toAbsolutePath().toString());
+            logOutputs.add(config.getCleanTsvLogPath().toAbsolutePath().toString());
+            if (config.getSmtpConfig().isEnabled()) {
+                logOutputs.add(config.getSmtpMessageDir().toAbsolutePath().toString());
+            }
+            System.out.printf("Setup complete. Now listening on : %s%n", listeningPortList);
+            System.out.printf("Log files are being written to: %s%n", String.join(",", logOutputs));
+            if (!startupFailures.isEmpty()) {
+                System.err.printf("Startup completed with %d listener failure(s).%n", startupFailures.size());
+            }
+            if (dnsStarted) {
+                try {
+                    dnsServer.runLoop();
+                } catch (SocketException e) {
+                    throw withDnsStartContext(config, e);
+                }
+            } else {
+                try {
+                    new CountDownLatch(1).await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
         } catch (IllegalArgumentException e) {
             System.err.println("Argument error: " + e.getMessage());
             printUsage();
             System.exit(2);
+        } catch (BindException e) {
+            System.err.println(e.getMessage());
+            System.exit(3);
         } catch (SocketException e) {
             System.err.println("Unable to open network socket: " + e.getMessage());
             System.exit(3);
@@ -175,6 +247,48 @@ public final class Main {
             System.err.println("Failed to start service: " + e.getMessage());
             System.exit(4);
         }
+    }
+
+    private static IOException withBindContext(CaptureService tcpServer, BindException cause) {
+        String message = String.format(
+                "Unable to bind %s listener on %s:%d (address already in use)",
+                tcpServer.getProtocolName(),
+                tcpServer.getConfig().getListenAddress(),
+                tcpServer.getConfig().getListenPort());
+        return withCause(new BindException(message), cause);
+    }
+
+    private static IOException withStartContext(CaptureService tcpServer, Throwable cause) {
+        String causeMessage = cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage();
+        String message = String.format(
+                "Failed to start %s listener on %s:%d: %s",
+                tcpServer.getProtocolName(),
+                tcpServer.getConfig().getListenAddress(),
+                tcpServer.getConfig().getListenPort(),
+                causeMessage);
+        return withCause(new IOException(message), cause);
+    }
+
+    private static BindException withDnsBindContext(SinkholeConfig config, BindException cause) {
+        String message = String.format(
+                "Unable to bind DNS listener on %s:%d (address already in use)",
+                config.getListenAddress(),
+                config.getListenPort());
+        return withCause(new BindException(message), cause);
+    }
+
+    private static SocketException withDnsStartContext(SinkholeConfig config, SocketException cause) {
+        String message = String.format(
+                "Unable to open DNS socket on %s:%d: %s",
+                config.getListenAddress(),
+                config.getListenPort(),
+                cause.getMessage());
+        return withCause(new SocketException(message), cause);
+    }
+
+    private static <T extends Throwable> T withCause(T target, Throwable cause) {
+        target.initCause(cause);
+        return target;
     }
 
     private static void printUsage() {

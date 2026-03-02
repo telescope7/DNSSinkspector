@@ -43,9 +43,18 @@ public final class DnsServer {
         this.eventLogger = eventLogger;
     }
 
-    public void start() throws IOException {
+    public synchronized void bind() throws SocketException {
+        if (running && socket != null && !socket.isClosed()) {
+            return;
+        }
         socket = new DatagramSocket(new InetSocketAddress(config.getListenAddress(), config.getListenPort()));
         running = true;
+    }
+
+    public void runLoop() throws IOException {
+        if (!running || socket == null || socket.isClosed()) {
+            throw new IllegalStateException("DNS socket is not bound");
+        }
 
         while (running) {
             DatagramPacket packet = new DatagramPacket(new byte[MAX_PACKET_BYTES], MAX_PACKET_BYTES);
@@ -59,6 +68,11 @@ public final class DnsServer {
             }
             handlePacket(packet);
         }
+    }
+
+    public void start() throws IOException {
+        bind();
+        runLoop();
     }
 
     public void stop() {
